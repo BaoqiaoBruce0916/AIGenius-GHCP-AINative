@@ -178,6 +178,92 @@ class TestListCommand:
         assert "No tasks match" in result.output
 
 
+class TestSearchCommand:
+    def test_search_matches_chinese_name_and_sorts_by_priority(
+        self, runner: CliRunner, isolated_tasks_file: Path
+    ) -> None:
+        tasks = [
+            {
+                "id": 1,
+                "name": "准备发布说明",
+                "description": "",
+                "priority": "low",
+                "tags": [],
+                "due_date": None,
+                "done": False,
+                "created_at": "2025-01-01T09:00:00",
+            },
+            {
+                "id": 2,
+                "name": "发布版本",
+                "description": None,
+                "priority": "high",
+                "tags": [],
+                "due_date": None,
+                "done": False,
+                "created_at": "2025-01-01T10:00:00",
+            },
+            {
+                "id": 3,
+                "name": "发布热修复",
+                "description": "",
+                "priority": "high",
+                "tags": [],
+                "due_date": None,
+                "done": False,
+                "created_at": "2025-01-01T10:30:00",
+            },
+            {
+                "id": 4,
+                "name": "发布公告",
+                "description": "",
+                "priority": "medium",
+                "tags": [],
+                "due_date": None,
+                "done": False,
+                "created_at": "2025-01-01T11:00:00",
+            },
+        ]
+        save_tasks(tasks)
+
+        result = runner.invoke(cli, ["search", "发布"])
+
+        assert result.exit_code == 0
+        first_high_index = result.output.index("发布版本")
+        second_high_index = result.output.index("发布热修复")
+        medium_index = result.output.index("发布公告")
+        low_index = result.output.index("准备发布说明")
+        assert first_high_index < second_high_index < medium_index < low_index
+
+    def test_search_matches_description(self, runner: CliRunner, sample_tasks: list[dict]) -> None:
+        result = runner.invoke(cli, ["search", "pipeline"])
+
+        assert result.exit_code == 0
+        assert "Deploy to production" in result.output
+        assert "Buy groceries" not in result.output
+
+    def test_search_is_case_insensitive_for_english(
+        self, runner: CliRunner, sample_tasks: list[dict]
+    ) -> None:
+        result = runner.invoke(cli, ["search", "deploy"])
+
+        assert result.exit_code == 0
+        assert "Deploy to production" in result.output
+
+    def test_search_blank_keyword_fails_cleanly(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["search", "   "])
+
+        assert result.exit_code != 0
+        assert "关键词不能为空" in result.output
+        assert "Traceback" not in result.output
+
+    def test_search_no_results_message(self, runner: CliRunner, sample_tasks: list[dict]) -> None:
+        result = runner.invoke(cli, ["search", "不存在"])
+
+        assert result.exit_code == 0
+        assert "未找到包含“不存在”的任务" in result.output
+
+
 class TestCompleteCommand:
     def test_complete_marks_done(self, runner: CliRunner, sample_tasks: list[dict]) -> None:
         result = runner.invoke(cli, ["complete", "1"])
